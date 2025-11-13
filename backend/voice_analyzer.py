@@ -3,10 +3,18 @@ Voice activity detection and audio quality analysis
 """
 import numpy as np
 import librosa
-import webrtcvad
-from typing import List, Tuple, Dict
+from typing import List, Tuple, Dict, Optional
 import logging
 import struct
+
+# Optional webrtcvad import - fallback to energy-based method if not available
+try:
+    import webrtcvad
+    HAS_WEBRTCVAD = True
+except ImportError:
+    HAS_WEBRTCVAD = False
+    logger = logging.getLogger(__name__)
+    logger.warning("webrtcvad not available, using energy-based VAD fallback")
 
 logger = logging.getLogger(__name__)
 
@@ -15,8 +23,14 @@ class VoiceAnalyzer:
 
     def __init__(self, sample_rate: int = 16000):
         self.sample_rate = sample_rate
-        self.vad = webrtcvad.Vad()
-        self.vad.set_mode(3)  # Aggressive mode (0-3, 3 is most aggressive)
+        self.vad: Optional[object] = None
+
+        if HAS_WEBRTCVAD:
+            self.vad = webrtcvad.Vad()
+            self.vad.set_mode(3)  # Aggressive mode (0-3, 3 is most aggressive)
+            logger.info("Using WebRTC VAD")
+        else:
+            logger.info("Using energy-based VAD")
 
     def detect_voice_activity(self, audio_path: str,
                              frame_duration: int = 30) -> List[Tuple[float, float]]:
@@ -33,6 +47,20 @@ class VoiceAnalyzer:
         try:
             logger.info(f"Detecting voice activity in {audio_path}")
 
+            # Use WebRTC VAD if available, otherwise fallback to energy-based
+            if HAS_WEBRTCVAD and self.vad is not None:
+                return self._detect_voice_webrtc(audio_path, frame_duration)
+            else:
+                return self.detect_voice_segments_energy(audio_path)
+
+        except Exception as e:
+            logger.error(f"Error detecting voice activity: {str(e)}")
+            raise
+
+    def _detect_voice_webrtc(self, audio_path: str,
+                            frame_duration: int = 30) -> List[Tuple[float, float]]:
+        """WebRTC-based voice activity detection"""
+        try:
             # Load audio
             audio, sr = librosa.load(audio_path, sr=self.sample_rate, mono=True)
 
@@ -64,7 +92,7 @@ class VoiceAnalyzer:
             return segments
 
         except Exception as e:
-            logger.error(f"Error detecting voice activity: {str(e)}")
+            logger.error(f"Error in WebRTC VAD: {str(e)}")
             raise
 
     def _merge_voice_segments(self, voice_frames: List[Tuple[float, bool]],

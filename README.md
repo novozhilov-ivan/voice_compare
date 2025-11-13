@@ -76,6 +76,16 @@ venv\Scripts\activate  # Windows
 
 ### 3. Установить зависимости
 
+**С использованием uv (рекомендуется):**
+```bash
+# Установить uv если еще не установлен
+curl -LsSf https://astral.sh/uv/install.sh | sh
+
+# Установить зависимости
+uv sync
+```
+
+**Или с использованием pip:**
 ```bash
 pip install -r requirements.txt
 ```
@@ -100,9 +110,15 @@ brew install ffmpeg
 
 ### Запуск сервера
 
+**С использованием uv:**
 ```bash
-cd backend
-python app.py
+uv run python run.py
+```
+
+**Или обычный способ:**
+```bash
+source .venv/bin/activate  # или venv/bin/activate
+python run.py
 ```
 
 Сервер запустится на `http://localhost:8000`

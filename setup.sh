@@ -21,31 +21,31 @@ else
     exit 1
 fi
 
-# Create virtual environment if it doesn't exist
-if [ ! -d "venv" ]; then
+# Install uv if not already installed
+if ! command -v uv &> /dev/null; then
     echo ""
-    echo "Creating virtual environment..."
-    python3 -m venv venv
+    echo "Installing uv..."
+    curl -LsSf https://astral.sh/uv/install.sh | sh
+    export PATH="$HOME/.cargo/bin:$PATH"
+else
+    echo "✓ uv is installed"
+fi
+
+# Create virtual environment if it doesn't exist
+if [ ! -d ".venv" ]; then
+    echo ""
+    echo "Creating virtual environment with uv..."
+    uv venv
     echo "✓ Virtual environment created"
 else
     echo "✓ Virtual environment already exists"
 fi
 
-# Activate virtual environment
+# Install dependencies
 echo ""
-echo "Activating virtual environment..."
-source venv/bin/activate
-
-# Upgrade pip
-echo ""
-echo "Upgrading pip..."
-pip install --upgrade pip
-
-# Install requirements
-echo ""
-echo "Installing Python dependencies..."
+echo "Installing Python dependencies with uv..."
 echo "This may take several minutes..."
-pip install -r requirements.txt
+uv sync
 
 # Create necessary directories
 echo ""
@@ -61,10 +61,10 @@ echo "✓ Setup completed successfully!"
 echo "================================================"
 echo ""
 echo "To start the application:"
-echo "  1. Activate virtual environment: source venv/bin/activate"
+echo "  1. Activate virtual environment: source .venv/bin/activate"
 echo "  2. Run the application: python run.py"
 echo ""
-echo "Or simply run: ./run.py"
+echo "Or simply run: uv run python run.py"
 echo ""
 echo "Web interface will be available at:"
 echo "  http://localhost:8000/static/index.html"
