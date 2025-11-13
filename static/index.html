@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Voice Speaker Recognition</title>
+    <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🎤 Voice Speaker Recognition</h1>
+            <p>Compare speaker voices from YouTube videos</p>
+        </header>
+
+        <div class="tabs">
+            <button class="tab-btn active" onclick="showTab('compare')">Compare Speakers</button>
+            <button class="tab-btn" onclick="showTab('analyze')">Analyze Voice</button>
+            <button class="tab-btn" onclick="showTab('playlist')">Process Playlist</button>
+        </div>
+
+        <!-- Compare Speakers Tab -->
+        <div id="compare-tab" class="tab-content active">
+            <div class="card">
+                <h2>Compare Two Speakers</h2>
+                <p>Enter video URLs for two different speakers to compare their voices</p>
+
+                <div class="form-group">
+                    <label>Speaker 1 Video URLs (one per line)</label>
+                    <textarea id="speaker1-urls" placeholder="https://www.youtube.com/watch?v=...
+https://www.youtube.com/watch?v=..."></textarea>
+                </div>
+
+                <div class="form-group">
+                    <label>Speaker 1 Name (optional)</label>
+                    <input type="text" id="speaker1-name" placeholder="e.g., John Doe">
+                </div>
+
+                <div class="form-group">
+                    <label>Speaker 2 Video URLs (one per line)</label>
+                    <textarea id="speaker2-urls" placeholder="https://www.youtube.com/watch?v=...
+https://www.youtube.com/watch?v=..."></textarea>
+                </div>
+
+                <div class="form-group">
+                    <label>Speaker 2 Name (optional)</label>
+                    <input type="text" id="speaker2-name" placeholder="e.g., Jane Smith">
+                </div>
+
+                <div class="form-group">
+                    <label>
+                        <input type="checkbox" id="compare-use-transcripts" checked>
+                        Use transcripts to improve accuracy
+                    </label>
+                </div>
+
+                <button class="btn btn-primary" onclick="compareSpeakers()">Compare Speakers</button>
+            </div>
+        </div>
+
+        <!-- Analyze Voice Tab -->
+        <div id="analyze-tab" class="tab-content">
+            <div class="card">
+                <h2>Analyze Speaker Voice</h2>
+                <p>Create a voice profile from one or more videos</p>
+
+                <div class="form-group">
+                    <label>Video URLs (one per line)</label>
+                    <textarea id="analyze-urls" placeholder="https://www.youtube.com/watch?v=...
+https://www.youtube.com/watch?v=..."></textarea>
+                </div>
+
+                <div class="form-group">
+                    <label>Speaker Name (optional)</label>
+                    <input type="text" id="analyze-name" placeholder="e.g., John Doe">
+                </div>
+
+                <div class="form-group">
+                    <label>
+                        <input type="checkbox" id="analyze-use-transcripts" checked>
+                        Use transcripts to filter voice segments
+                    </label>
+                </div>
+
+                <button class="btn btn-primary" onclick="analyzeVoice()">Analyze Voice</button>
+            </div>
+        </div>
+
+        <!-- Playlist Tab -->
+        <div id="playlist-tab" class="tab-content">
+            <div class="card">
+                <h2>Process Playlist</h2>
+                <p>Analyze all videos from a YouTube playlist</p>
+
+                <div class="form-group">
+                    <label>Playlist URL</label>
+                    <input type="text" id="playlist-url" placeholder="https://www.youtube.com/playlist?list=...">
+                </div>
+
+                <div class="form-group">
+                    <label>Target Speaker Name (optional)</label>
+                    <input type="text" id="playlist-speaker" placeholder="e.g., John Doe">
+                </div>
+
+                <div class="form-group">
+                    <label>
+                        <input type="checkbox" id="playlist-use-transcripts" checked>
+                        Use transcripts to filter voice segments
+                    </label>
+                </div>
+
+                <button class="btn btn-primary" onclick="processPlaylist()">Process Playlist</button>
+            </div>
+        </div>
+
+        <!-- Results Section -->
+        <div id="results" class="card" style="display: none;">
+            <h2>Results</h2>
+            <div id="progress" style="display: none;">
+                <div class="progress-bar">
+                    <div id="progress-fill" class="progress-fill"></div>
+                </div>
+                <p id="progress-message">Processing...</p>
+            </div>
+            <div id="result-content"></div>
+        </div>
+    </div>
+
+    <script src="/static/app.js"></script>
+</body>
+</html>
