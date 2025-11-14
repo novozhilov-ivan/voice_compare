@@ -414,7 +414,7 @@ tqdm==4.66.1
     #   pytorch-metric-learning
     #   speechbrain
     #   transformers
-transformers==4.35.2
+transformers==4.53.0
     # via voice-compare (pyproject.toml)
 triton==2.1.0
     # via torch
