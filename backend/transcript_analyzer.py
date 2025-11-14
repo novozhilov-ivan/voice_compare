@@ -1,14 +1,16 @@
 """
 Transcript analysis component for identifying speaker timestamps
 """
+
+import logging
+import re
+from urllib.parse import parse_qs, urlparse
+
 from youtube_transcript_api import YouTubeTranscriptApi
 from youtube_transcript_api.formatters import TextFormatter
-from typing import List, Dict, Tuple, Optional
-import re
-import logging
-from urllib.parse import urlparse, parse_qs
 
 logger = logging.getLogger(__name__)
+
 
 class TranscriptAnalyzer:
     """Analyze video transcripts to identify speaker timestamps"""
@@ -16,7 +18,7 @@ class TranscriptAnalyzer:
     def __init__(self):
         self.formatter = TextFormatter()
 
-    def get_transcript(self, video_url: str, languages: List[str] = None) -> Optional[List[Dict]]:
+    def get_transcript(self, video_url: str, languages: list[str] = None) -> list[dict] | None:
         """
         Get transcript from YouTube video
 
@@ -29,7 +31,7 @@ class TranscriptAnalyzer:
         """
         try:
             if languages is None:
-                languages = ['en', 'ru']
+                languages = ["en", "ru"]
 
             video_id = self._extract_video_id(video_url)
             if not video_id:
@@ -40,10 +42,7 @@ class TranscriptAnalyzer:
 
             # Try to get transcript
             try:
-                transcript = YouTubeTranscriptApi.get_transcript(
-                    video_id,
-                    languages=languages
-                )
+                transcript = YouTubeTranscriptApi.get_transcript(video_id, languages=languages)
                 logger.info(f"Found transcript with {len(transcript)} entries")
                 return transcript
 
@@ -64,23 +63,21 @@ class TranscriptAnalyzer:
             logger.error(f"Error getting transcript: {str(e)}")
             return None
 
-    def _extract_video_id(self, url: str) -> Optional[str]:
+    def _extract_video_id(self, url: str) -> str | None:
         """Extract video ID from YouTube URL"""
         try:
             # Parse URL
             parsed = urlparse(url)
 
             # Handle different YouTube URL formats
-            if parsed.hostname in ['www.youtube.com', 'youtube.com']:
-                if parsed.path == '/watch':
+            if parsed.hostname in ["www.youtube.com", "youtube.com"]:
+                if parsed.path == "/watch":
                     query = parse_qs(parsed.query)
-                    return query.get('v', [None])[0]
-                elif parsed.path.startswith('/embed/'):
-                    return parsed.path.split('/')[2]
-                elif parsed.path.startswith('/v/'):
-                    return parsed.path.split('/')[2]
+                    return query.get("v", [None])[0]
+                elif parsed.path.startswith("/embed/") or parsed.path.startswith("/v/"):
+                    return parsed.path.split("/")[2]
 
-            elif parsed.hostname in ['youtu.be', 'www.youtu.be']:
+            elif parsed.hostname in ["youtu.be", "www.youtu.be"]:
                 return parsed.path[1:]
 
             return None
@@ -89,8 +86,9 @@ class TranscriptAnalyzer:
             logger.error(f"Error extracting video ID: {str(e)}")
             return None
 
-    def search_speaker_mentions(self, transcript: List[Dict],
-                               speaker_name: str) -> List[Tuple[float, float]]:
+    def search_speaker_mentions(
+        self, transcript: list[dict], speaker_name: str
+    ) -> list[tuple[float, float]]:
         """
         Search for mentions of speaker name in transcript
 
@@ -112,12 +110,12 @@ class TranscriptAnalyzer:
             name_parts = name_lower.split()
 
             for entry in transcript:
-                text = entry.get('text', '').lower()
+                text = entry.get("text", "").lower()
 
                 # Check if any part of the name is mentioned
                 if any(part in text for part in name_parts if len(part) > 2):
-                    start_time = entry.get('start', 0)
-                    duration = entry.get('duration', 0)
+                    start_time = entry.get("start", 0)
+                    duration = entry.get("duration", 0)
                     end_time = start_time + duration
 
                     mentions.append((start_time, end_time))
@@ -129,10 +127,13 @@ class TranscriptAnalyzer:
             logger.error(f"Error searching speaker mentions: {str(e)}")
             return []
 
-    def filter_by_speaker(self, transcript: List[Dict],
-                         speaker_name: str,
-                         voice_segments: List[Tuple[float, float]],
-                         context_window: float = 10.0) -> List[Tuple[float, float]]:
+    def filter_by_speaker(
+        self,
+        transcript: list[dict],
+        speaker_name: str,
+        voice_segments: list[tuple[float, float]],
+        context_window: float = 10.0,
+    ) -> list[tuple[float, float]]:
         """
         Filter voice segments to only include those likely from target speaker
 
@@ -161,8 +162,10 @@ class TranscriptAnalyzer:
             for seg_start, seg_end in voice_segments:
                 for mention_start, mention_end in mentions:
                     # Check if segment is within context window of mention
-                    if (seg_start >= mention_start - context_window and
-                        seg_start <= mention_end + context_window):
+                    if (
+                        seg_start >= mention_start - context_window
+                        and seg_start <= mention_end + context_window
+                    ):
                         filtered_segments.append((seg_start, seg_end))
                         break
 
@@ -173,8 +176,9 @@ class TranscriptAnalyzer:
             logger.error(f"Error filtering by speaker: {str(e)}")
             return voice_segments
 
-    def identify_speaker_segments(self, transcript: List[Dict],
-                                 speaker_indicators: List[str] = None) -> Dict[str, List[Tuple[float, float]]]:
+    def identify_speaker_segments(
+        self, transcript: list[dict], speaker_indicators: list[str] = None
+    ) -> dict[str, list[tuple[float, float]]]:
         """
         Identify segments for different speakers based on indicators
 
@@ -189,10 +193,10 @@ class TranscriptAnalyzer:
             if speaker_indicators is None:
                 # Common patterns that indicate speaker changes
                 speaker_indicators = [
-                    r'^\s*>>\s*',  # >> at start
-                    r'^\s*\[.*?\]\s*:',  # [Name]:
-                    r'^\s*\w+\s*:',  # Name:
-                    r'^\s*-\s+',  # - at start
+                    r"^\s*>>\s*",  # >> at start
+                    r"^\s*\[.*?\]\s*:",  # [Name]:
+                    r"^\s*\w+\s*:",  # Name:
+                    r"^\s*-\s+",  # - at start
                 ]
 
             logger.info("Identifying speaker segments")
@@ -202,9 +206,9 @@ class TranscriptAnalyzer:
             speaker_times = []
 
             for entry in transcript:
-                text = entry.get('text', '')
-                start_time = entry.get('start', 0)
-                duration = entry.get('duration', 0)
+                text = entry.get("text", "")
+                start_time = entry.get("start", 0)
+                duration = entry.get("duration", 0)
                 end_time = start_time + duration
 
                 # Check for speaker indicator
@@ -247,19 +251,19 @@ class TranscriptAnalyzer:
     def _extract_speaker_name(self, text: str) -> str:
         """Extract speaker name from text"""
         # Remove common prefixes
-        text = re.sub(r'^\s*>>\s*', '', text)
-        text = re.sub(r'^\s*-\s+', '', text)
+        text = re.sub(r"^\s*>>\s*", "", text)
+        text = re.sub(r"^\s*-\s+", "", text)
 
         # Extract name before colon
-        match = re.match(r'^\s*\[?(.*?)\]?\s*:', text)
+        match = re.match(r"^\s*\[?(.*?)\]?\s*:", text)
         if match:
             return match.group(1).strip()
 
         # Return first few words
         words = text.split()[:2]
-        return ' '.join(words)
+        return " ".join(words)
 
-    def get_transcript_text(self, transcript: List[Dict]) -> str:
+    def get_transcript_text(self, transcript: list[dict]) -> str:
         """
         Get full transcript as text
 
@@ -273,15 +277,16 @@ class TranscriptAnalyzer:
             if not transcript:
                 return ""
 
-            text = ' '.join([entry.get('text', '') for entry in transcript])
+            text = " ".join([entry.get("text", "") for entry in transcript])
             return text
 
         except Exception as e:
             logger.error(f"Error getting transcript text: {str(e)}")
             return ""
 
-    def find_keywords(self, transcript: List[Dict],
-                     keywords: List[str]) -> Dict[str, List[Tuple[float, str]]]:
+    def find_keywords(
+        self, transcript: list[dict], keywords: list[str]
+    ) -> dict[str, list[tuple[float, str]]]:
         """
         Find occurrences of keywords in transcript
 
@@ -298,8 +303,8 @@ class TranscriptAnalyzer:
             results = {keyword: [] for keyword in keywords}
 
             for entry in transcript:
-                text = entry.get('text', '')
-                start_time = entry.get('start', 0)
+                text = entry.get("text", "")
+                start_time = entry.get("start", 0)
 
                 text_lower = text.lower()
 
@@ -318,8 +323,7 @@ class TranscriptAnalyzer:
             logger.error(f"Error finding keywords: {str(e)}")
             return {keyword: [] for keyword in keywords}
 
-    def summarize_transcript(self, transcript: List[Dict],
-                           max_sentences: int = 5) -> str:
+    def summarize_transcript(self, transcript: list[dict], max_sentences: int = 5) -> str:
         """
         Create a simple summary of transcript
 
@@ -338,7 +342,7 @@ class TranscriptAnalyzer:
             text = self.get_transcript_text(transcript)
 
             # Split into sentences (simple approach)
-            sentences = re.split(r'[.!?]+', text)
+            sentences = re.split(r"[.!?]+", text)
             sentences = [s.strip() for s in sentences if len(s.strip()) > 20]
 
             # Take first and last sentences, and some from middle
@@ -357,14 +361,14 @@ class TranscriptAnalyzer:
                 # Last sentence
                 summary_sentences.append(sentences[-1])
 
-            summary = '. '.join(summary_sentences) + '.'
+            summary = ". ".join(summary_sentences) + "."
             return summary
 
         except Exception as e:
             logger.error(f"Error summarizing transcript: {str(e)}")
             return ""
 
-    def get_transcript_stats(self, transcript: List[Dict]) -> Dict:
+    def get_transcript_stats(self, transcript: list[dict]) -> dict:
         """
         Get statistics about transcript
 
@@ -377,10 +381,10 @@ class TranscriptAnalyzer:
         try:
             if not transcript:
                 return {
-                    'num_entries': 0,
-                    'total_duration': 0,
-                    'total_words': 0,
-                    'avg_words_per_entry': 0
+                    "num_entries": 0,
+                    "total_duration": 0,
+                    "total_words": 0,
+                    "avg_words_per_entry": 0,
                 }
 
             num_entries = len(transcript)
@@ -388,24 +392,24 @@ class TranscriptAnalyzer:
             # Calculate total duration
             if transcript:
                 last_entry = transcript[-1]
-                total_duration = last_entry.get('start', 0) + last_entry.get('duration', 0)
+                total_duration = last_entry.get("start", 0) + last_entry.get("duration", 0)
             else:
                 total_duration = 0
 
             # Count words
             total_words = 0
             for entry in transcript:
-                text = entry.get('text', '')
+                text = entry.get("text", "")
                 words = len(text.split())
                 total_words += words
 
             avg_words = total_words / num_entries if num_entries > 0 else 0
 
             stats = {
-                'num_entries': num_entries,
-                'total_duration': total_duration,
-                'total_words': total_words,
-                'avg_words_per_entry': avg_words
+                "num_entries": num_entries,
+                "total_duration": total_duration,
+                "total_words": total_words,
+                "avg_words_per_entry": avg_words,
             }
 
             return stats

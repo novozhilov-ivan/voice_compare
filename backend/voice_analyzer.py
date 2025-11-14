@@ -1,15 +1,17 @@
 """
 Voice activity detection and audio quality analysis
 """
-import numpy as np
-import librosa
-from typing import List, Tuple, Dict, Optional
+
 import logging
 import struct
+
+import librosa
+import numpy as np
 
 # Optional webrtcvad import - fallback to energy-based method if not available
 try:
     import webrtcvad
+
     HAS_WEBRTCVAD = True
 except ImportError:
     HAS_WEBRTCVAD = False
@@ -18,12 +20,13 @@ except ImportError:
 
 logger = logging.getLogger(__name__)
 
+
 class VoiceAnalyzer:
     """Detect voice activity and analyze audio quality"""
 
     def __init__(self, sample_rate: int = 16000):
         self.sample_rate = sample_rate
-        self.vad: Optional[object] = None
+        self.vad: object | None = None
 
         if HAS_WEBRTCVAD:
             self.vad = webrtcvad.Vad()
@@ -32,8 +35,9 @@ class VoiceAnalyzer:
         else:
             logger.info("Using energy-based VAD")
 
-    def detect_voice_activity(self, audio_path: str,
-                             frame_duration: int = 30) -> List[Tuple[float, float]]:
+    def detect_voice_activity(
+        self, audio_path: str, frame_duration: int = 30
+    ) -> list[tuple[float, float]]:
         """
         Detect voice activity in audio file
 
@@ -57,8 +61,9 @@ class VoiceAnalyzer:
             logger.error(f"Error detecting voice activity: {str(e)}")
             raise
 
-    def _detect_voice_webrtc(self, audio_path: str,
-                            frame_duration: int = 30) -> List[Tuple[float, float]]:
+    def _detect_voice_webrtc(
+        self, audio_path: str, frame_duration: int = 30
+    ) -> list[tuple[float, float]]:
         """WebRTC-based voice activity detection"""
         try:
             # Load audio
@@ -73,10 +78,10 @@ class VoiceAnalyzer:
             # Detect voice frames
             voice_frames = []
             for i in range(0, len(audio_int16) - frame_samples, frame_samples):
-                frame = audio_int16[i:i + frame_samples]
+                frame = audio_int16[i : i + frame_samples]
 
                 # Convert to bytes
-                frame_bytes = struct.pack("%dh" % len(frame), *frame)
+                frame_bytes = struct.pack(f"{len(frame)}h", *frame)
 
                 # Check if frame contains speech
                 try:
@@ -95,9 +100,12 @@ class VoiceAnalyzer:
             logger.error(f"Error in WebRTC VAD: {str(e)}")
             raise
 
-    def _merge_voice_segments(self, voice_frames: List[Tuple[float, bool]],
-                             min_duration: float = 0.5,
-                             max_gap: float = 0.3) -> List[Tuple[float, float]]:
+    def _merge_voice_segments(
+        self,
+        voice_frames: list[tuple[float, bool]],
+        min_duration: float = 0.5,
+        max_gap: float = 0.3,
+    ) -> list[tuple[float, float]]:
         """
         Merge consecutive voice frames into segments
 
@@ -141,15 +149,14 @@ class VoiceAnalyzer:
 
         return segments
 
-    def _find_next_speech(self, voice_frames: List[Tuple[float, bool]],
-                         start_idx: int) -> int:
+    def _find_next_speech(self, voice_frames: list[tuple[float, bool]], start_idx: int) -> int:
         """Find index of next speech frame"""
         for i in range(start_idx, len(voice_frames)):
             if voice_frames[i][1]:
                 return i
         return None
 
-    def assess_quality(self, audio_files: List[str]) -> Dict:
+    def assess_quality(self, audio_files: list[str]) -> dict:
         """
         Assess quality of audio data
 
@@ -193,14 +200,14 @@ class VoiceAnalyzer:
             avg_quality = np.mean(quality_scores) if quality_scores else 0
 
             metrics = {
-                'total_duration': total_duration,
-                'speech_duration': total_speech_duration,
-                'speech_ratio': total_speech_duration / total_duration if total_duration > 0 else 0,
-                'average_snr': avg_snr,
-                'average_quality': avg_quality,
-                'num_files': len(audio_files),
-                'sufficient_data': total_speech_duration >= 10.0,  # At least 10 seconds
-                'quality_level': self._interpret_quality(avg_quality)
+                "total_duration": total_duration,
+                "speech_duration": total_speech_duration,
+                "speech_ratio": total_speech_duration / total_duration if total_duration > 0 else 0,
+                "average_snr": avg_snr,
+                "average_quality": avg_quality,
+                "num_files": len(audio_files),
+                "sufficient_data": total_speech_duration >= 10.0,  # At least 10 seconds
+                "quality_level": self._interpret_quality(avg_quality),
             }
 
             logger.info(f"Quality assessment: {metrics['quality_level']}")
@@ -222,25 +229,22 @@ class VoiceAnalyzer:
         """
         try:
             # Calculate signal power
-            signal_power = np.mean(audio ** 2)
+            signal_power = np.mean(audio**2)
 
             # Estimate noise power (use quietest 10% of frames)
             frame_size = int(0.1 * self.sample_rate)
             frame_powers = []
 
             for i in range(0, len(audio) - frame_size, frame_size):
-                frame = audio[i:i + frame_size]
-                power = np.mean(frame ** 2)
+                frame = audio[i : i + frame_size]
+                power = np.mean(frame**2)
                 frame_powers.append(power)
 
             if frame_powers:
                 noise_power = np.percentile(frame_powers, 10)
 
                 # Calculate SNR
-                if noise_power > 0:
-                    snr = 10 * np.log10(signal_power / noise_power)
-                else:
-                    snr = 100  # Very high SNR if no noise detected
+                snr = 10 * np.log10(signal_power / noise_power) if noise_power > 0 else 100
 
                 return snr
             else:
@@ -250,8 +254,9 @@ class VoiceAnalyzer:
             logger.error(f"Error calculating SNR: {str(e)}")
             return 0
 
-    def _calculate_quality_score(self, audio: np.ndarray, sr: int,
-                                 voice_segments: List[Tuple[float, float]]) -> float:
+    def _calculate_quality_score(
+        self, audio: np.ndarray, sr: int, voice_segments: list[tuple[float, float]]
+    ) -> float:
         """
         Calculate overall quality score (0-1)
 
@@ -283,8 +288,8 @@ class VoiceAnalyzer:
             frame_amplitudes = []
 
             for i in range(0, len(audio) - frame_size, frame_size):
-                frame = audio[i:i + frame_size]
-                amplitude = np.sqrt(np.mean(frame ** 2))
+                frame = audio[i : i + frame_size]
+                amplitude = np.sqrt(np.mean(frame**2))
                 frame_amplitudes.append(amplitude)
 
             if frame_amplitudes:
@@ -312,8 +317,9 @@ class VoiceAnalyzer:
         else:
             return "poor"
 
-    def detect_voice_segments_energy(self, audio_path: str,
-                                    energy_threshold: float = 0.02) -> List[Tuple[float, float]]:
+    def detect_voice_segments_energy(
+        self, audio_path: str, energy_threshold: float = 0.02
+    ) -> list[tuple[float, float]]:
         """
         Detect voice segments using energy-based method (fallback)
 
@@ -330,13 +336,11 @@ class VoiceAnalyzer:
 
             # Calculate energy
             frame_length = int(0.025 * sr)  # 25ms frames
-            hop_length = int(0.010 * sr)    # 10ms hop
+            hop_length = int(0.010 * sr)  # 10ms hop
 
-            energy = librosa.feature.rms(
-                y=audio,
-                frame_length=frame_length,
-                hop_length=hop_length
-            )[0]
+            energy = librosa.feature.rms(y=audio, frame_length=frame_length, hop_length=hop_length)[
+                0
+            ]
 
             # Detect voice frames
             voice_frames = energy > energy_threshold
@@ -369,7 +373,7 @@ class VoiceAnalyzer:
             logger.error(f"Error in energy-based detection: {str(e)}")
             raise
 
-    def extract_voice_segments(self, audio_path: str, output_dir: str = None) -> List[str]:
+    def extract_voice_segments(self, audio_path: str, output_dir: str = None) -> list[str]:
         """
         Extract voice segments and save as separate files
 
@@ -382,6 +386,7 @@ class VoiceAnalyzer:
         """
         try:
             from pathlib import Path
+
             import soundfile as sf
 
             if output_dir is None:

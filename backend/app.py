@@ -1,26 +1,23 @@
 """
 Main FastAPI application for voice comparison service
 """
-from fastapi import FastAPI, HTTPException, BackgroundTasks
+
+import logging
+
+from fastapi import BackgroundTasks, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import JSONResponse
 from pydantic import BaseModel, HttpUrl
-from typing import List, Optional
-import logging
-import os
-from pathlib import Path
 
-from youtube_downloader import YouTubeDownloader
-from audio_processor import AudioProcessor
-from voice_analyzer import VoiceAnalyzer
-from speaker_recognition import SpeakerRecognition
-from transcript_analyzer import TranscriptAnalyzer
+from .audio_processor import AudioProcessor
+from .speaker_recognition import SpeakerRecognition
+from .transcript_analyzer import TranscriptAnalyzer
+from .voice_analyzer import VoiceAnalyzer
+from .youtube_downloader import YouTubeDownloader
 
 # Setup logging
 logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
 logger = logging.getLogger(__name__)
 
@@ -28,7 +25,7 @@ logger = logging.getLogger(__name__)
 app = FastAPI(
     title="Voice Speaker Recognition Service",
     description="Service for comparing speaker voices from YouTube videos",
-    version="1.0.0"
+    version="1.0.0",
 )
 
 # CORS middleware
@@ -50,47 +47,51 @@ voice_analyzer = VoiceAnalyzer()
 speaker_recognition = SpeakerRecognition()
 transcript_analyzer = TranscriptAnalyzer()
 
+
 # Data models
 class VideoRequest(BaseModel):
-    urls: List[HttpUrl]
-    target_speaker: Optional[str] = None
+    urls: list[HttpUrl]
+    target_speaker: str | None = None
     use_transcripts: bool = True
+
 
 class PlaylistRequest(BaseModel):
     playlist_url: HttpUrl
-    target_speaker: Optional[str] = None
+    target_speaker: str | None = None
     use_transcripts: bool = True
 
+
 class ComparisonRequest(BaseModel):
-    video1_urls: List[HttpUrl]
-    video2_urls: List[HttpUrl]
-    target_speaker1: Optional[str] = None
-    target_speaker2: Optional[str] = None
+    video1_urls: list[HttpUrl]
+    video2_urls: list[HttpUrl]
+    target_speaker1: str | None = None
+    target_speaker2: str | None = None
     use_transcripts: bool = True
+
 
 class JobStatus(BaseModel):
     job_id: str
     status: str
     progress: float
     message: str
-    result: Optional[dict] = None
+    result: dict | None = None
+
 
 # In-memory job storage (in production use Redis or DB)
 jobs = {}
 
+
 @app.get("/")
 async def root():
     """Root endpoint"""
-    return {
-        "service": "Voice Speaker Recognition Service",
-        "version": "1.0.0",
-        "status": "running"
-    }
+    return {"service": "Voice Speaker Recognition Service", "version": "1.0.0", "status": "running"}
+
 
 @app.get("/health")
 async def health_check():
     """Health check endpoint"""
     return {"status": "healthy"}
+
 
 @app.post("/api/download-video")
 async def download_video(request: VideoRequest, background_tasks: BackgroundTasks):
@@ -101,7 +102,7 @@ async def download_video(request: VideoRequest, background_tasks: BackgroundTask
             "status": "processing",
             "progress": 0.0,
             "message": "Starting download...",
-            "result": None
+            "result": None,
         }
 
         logger.info(f"Starting job {job_id} for URLs: {request.urls}")
@@ -112,7 +113,7 @@ async def download_video(request: VideoRequest, background_tasks: BackgroundTask
             job_id,
             [str(url) for url in request.urls],
             request.target_speaker,
-            request.use_transcripts
+            request.use_transcripts,
         )
 
         return {"job_id": job_id, "message": "Processing started"}
@@ -120,6 +121,7 @@ async def download_video(request: VideoRequest, background_tasks: BackgroundTask
     except Exception as e:
         logger.error(f"Error in download_video: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
+
 
 @app.post("/api/download-playlist")
 async def download_playlist(request: PlaylistRequest, background_tasks: BackgroundTasks):
@@ -130,7 +132,7 @@ async def download_playlist(request: PlaylistRequest, background_tasks: Backgrou
             "status": "processing",
             "progress": 0.0,
             "message": "Getting playlist info...",
-            "result": None
+            "result": None,
         }
 
         logger.info(f"Starting job {job_id} for playlist: {request.playlist_url}")
@@ -140,21 +142,15 @@ async def download_playlist(request: PlaylistRequest, background_tasks: Backgrou
 
         # Process in background
         background_tasks.add_task(
-            process_videos,
-            job_id,
-            video_urls,
-            request.target_speaker,
-            request.use_transcripts
+            process_videos, job_id, video_urls, request.target_speaker, request.use_transcripts
         )
 
-        return {
-            "job_id": job_id,
-            "message": f"Processing started for {len(video_urls)} videos"
-        }
+        return {"job_id": job_id, "message": f"Processing started for {len(video_urls)} videos"}
 
     except Exception as e:
         logger.error(f"Error in download_playlist: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
+
 
 @app.post("/api/compare-speakers")
 async def compare_speakers(request: ComparisonRequest, background_tasks: BackgroundTasks):
@@ -165,7 +161,7 @@ async def compare_speakers(request: ComparisonRequest, background_tasks: Backgro
             "status": "processing",
             "progress": 0.0,
             "message": "Starting comparison...",
-            "result": None
+            "result": None,
         }
 
         logger.info(f"Starting comparison job {job_id}")
@@ -178,7 +174,7 @@ async def compare_speakers(request: ComparisonRequest, background_tasks: Backgro
             [str(url) for url in request.video2_urls],
             request.target_speaker1,
             request.target_speaker2,
-            request.use_transcripts
+            request.use_transcripts,
         )
 
         return {"job_id": job_id, "message": "Comparison started"}
@@ -187,6 +183,7 @@ async def compare_speakers(request: ComparisonRequest, background_tasks: Backgro
         logger.error(f"Error in compare_speakers: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
+
 @app.get("/api/job/{job_id}")
 async def get_job_status(job_id: str):
     """Get status of a processing job"""
@@ -194,6 +191,7 @@ async def get_job_status(job_id: str):
         raise HTTPException(status_code=404, detail="Job not found")
 
     return jobs[job_id]
+
 
 @app.delete("/api/job/{job_id}")
 async def cancel_job(job_id: str):
@@ -204,8 +202,11 @@ async def cancel_job(job_id: str):
     jobs[job_id]["status"] = "cancelled"
     return {"message": "Job cancelled"}
 
+
 # Background task functions
-async def process_videos(job_id: str, video_urls: List[str], target_speaker: Optional[str], use_transcripts: bool):
+async def process_videos(
+    job_id: str, video_urls: list[str], target_speaker: str | None, use_transcripts: bool
+):
     """Process videos in background"""
     try:
         total_steps = len(video_urls) * 4  # download, extract, analyze, recognize
@@ -216,7 +217,7 @@ async def process_videos(job_id: str, video_urls: List[str], target_speaker: Opt
 
         for i, url in enumerate(video_urls):
             # Update progress
-            jobs[job_id]["message"] = f"Processing video {i+1}/{len(video_urls)}"
+            jobs[job_id]["message"] = f"Processing video {i + 1}/{len(video_urls)}"
 
             # Download video
             video_path = youtube_dl.download_video(url)
@@ -241,11 +242,9 @@ async def process_videos(job_id: str, video_urls: List[str], target_speaker: Opt
 
             # Filter by target speaker if specified
             if target_speaker and use_transcripts and transcript:
-                filtered_segments = transcript_analyzer.filter_by_speaker(
+                _ = transcript_analyzer.filter_by_speaker(
                     transcript, target_speaker, voice_segments
                 )
-            else:
-                filtered_segments = voice_segments
 
             current_step += 1
             jobs[job_id]["progress"] = current_step / total_steps
@@ -265,7 +264,7 @@ async def process_videos(job_id: str, video_urls: List[str], target_speaker: Opt
             "speaker_profile": speaker_profile,
             "quality_metrics": quality_metrics,
             "videos_processed": len(video_urls),
-            "audio_files": all_audio_files
+            "audio_files": all_audio_files,
         }
 
     except Exception as e:
@@ -273,13 +272,14 @@ async def process_videos(job_id: str, video_urls: List[str], target_speaker: Opt
         jobs[job_id]["status"] = "failed"
         jobs[job_id]["message"] = f"Error: {str(e)}"
 
+
 async def compare_speaker_voices(
     job_id: str,
-    video_urls_1: List[str],
-    video_urls_2: List[str],
-    target_speaker1: Optional[str],
-    target_speaker2: Optional[str],
-    use_transcripts: bool
+    video_urls_1: list[str],
+    video_urls_2: list[str],
+    target_speaker1: str | None,
+    target_speaker2: str | None,
+    use_transcripts: bool,
 ):
     """Compare speakers from two sets of videos"""
     try:
@@ -329,13 +329,14 @@ async def compare_speaker_voices(
             "same_person_probability": similarity_score,
             "quality_speaker1": quality_1,
             "quality_speaker2": quality_2,
-            "interpretation": interpret_similarity(similarity_score)
+            "interpretation": interpret_similarity(similarity_score),
         }
 
     except Exception as e:
         logger.error(f"Error comparing speakers in job {job_id}: {str(e)}")
         jobs[job_id]["status"] = "failed"
         jobs[job_id]["message"] = f"Error: {str(e)}"
+
 
 def interpret_similarity(score: float) -> str:
     """Interpret similarity score"""
@@ -350,6 +351,8 @@ def interpret_similarity(score: float) -> str:
     else:
         return "Very low probability - almost certainly different people"
 
+
 if __name__ == "__main__":
     import uvicorn
+
     uvicorn.run(app, host="0.0.0.0", port=8000)

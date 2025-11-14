@@ -1,16 +1,18 @@
 """
 Speaker recognition and voice comparison component
 """
-import torch
-import torchaudio
-import numpy as np
-from speechbrain.pretrained import EncoderClassifier
-from typing import List, Dict, Optional
+
+import json
 import logging
 from pathlib import Path
-import json
+
+import numpy as np
+import torch
+import torchaudio
+from speechbrain.inference import EncoderClassifier
 
 logger = logging.getLogger(__name__)
+
 
 class SpeakerRecognition:
     """Speaker recognition and voice comparison using deep learning models"""
@@ -35,7 +37,7 @@ class SpeakerRecognition:
                 self.model = EncoderClassifier.from_hparams(
                     source="speechbrain/spkrec-ecapa-voxceleb",
                     savedir=str(self.model_dir / "spkrec-ecapa-voxceleb"),
-                    run_opts={"device": str(self.device)}
+                    run_opts={"device": str(self.device)},
                 )
 
                 logger.info("Model loaded successfully")
@@ -82,8 +84,7 @@ class SpeakerRecognition:
             logger.error(f"Error extracting embedding: {str(e)}")
             raise
 
-    def create_speaker_profile(self, audio_files: List[str],
-                              use_segments: bool = True) -> Dict:
+    def create_speaker_profile(self, audio_files: list[str], use_segments: bool = True) -> dict:
         """
         Create speaker profile from multiple audio files
 
@@ -103,6 +104,7 @@ class SpeakerRecognition:
                 if use_segments:
                     # Extract voice segments
                     from voice_analyzer import VoiceAnalyzer
+
                     analyzer = VoiceAnalyzer()
                     segment_files = analyzer.extract_voice_segments(audio_path)
 
@@ -128,11 +130,11 @@ class SpeakerRecognition:
             std_embedding = np.std(embeddings_array, axis=0)
 
             profile = {
-                'mean_embedding': mean_embedding.tolist(),
-                'std_embedding': std_embedding.tolist(),
-                'num_samples': len(embeddings),
-                'num_files': len(audio_files),
-                'embedding_dim': len(mean_embedding)
+                "mean_embedding": mean_embedding.tolist(),
+                "std_embedding": std_embedding.tolist(),
+                "num_samples": len(embeddings),
+                "num_files": len(audio_files),
+                "embedding_dim": len(mean_embedding),
             }
 
             logger.info(f"Speaker profile created with {len(embeddings)} embeddings")
@@ -142,7 +144,7 @@ class SpeakerRecognition:
             logger.error(f"Error creating speaker profile: {str(e)}")
             raise
 
-    def compare_speakers(self, profile1: Dict, profile2: Dict) -> float:
+    def compare_speakers(self, profile1: dict, profile2: dict) -> float:
         """
         Compare two speaker profiles
 
@@ -157,8 +159,8 @@ class SpeakerRecognition:
             logger.info("Comparing speaker profiles")
 
             # Get mean embeddings
-            embedding1 = np.array(profile1['mean_embedding'])
-            embedding2 = np.array(profile2['mean_embedding'])
+            embedding1 = np.array(profile1["mean_embedding"])
+            embedding2 = np.array(profile2["mean_embedding"])
 
             # Calculate cosine similarity
             similarity = self._cosine_similarity(embedding1, embedding2)
@@ -213,8 +215,9 @@ class SpeakerRecognition:
             logger.error(f"Error comparing audio files: {str(e)}")
             raise
 
-    def calculate_confidence(self, similarity_score: float,
-                           quality1: Dict, quality2: Dict) -> float:
+    def calculate_confidence(
+        self, similarity_score: float, quality1: dict, quality2: dict
+    ) -> float:
         """
         Calculate confidence in the comparison result
 
@@ -232,24 +235,20 @@ class SpeakerRecognition:
             score_confidence = 1 - 2 * abs(similarity_score - 0.5)
 
             # Quality-based confidence
-            q1 = quality1.get('average_quality', 0.5)
-            q2 = quality2.get('average_quality', 0.5)
+            q1 = quality1.get("average_quality", 0.5)
+            q2 = quality2.get("average_quality", 0.5)
             quality_confidence = (q1 + q2) / 2
 
             # Data amount confidence
-            duration1 = quality1.get('speech_duration', 0)
-            duration2 = quality2.get('speech_duration', 0)
+            duration1 = quality1.get("speech_duration", 0)
+            duration2 = quality2.get("speech_duration", 0)
             min_duration = min(duration1, duration2)
 
             # More data = higher confidence (plateau at 30 seconds)
             data_confidence = min(min_duration / 30.0, 1.0)
 
             # Combined confidence
-            confidence = (
-                score_confidence * 0.4 +
-                quality_confidence * 0.3 +
-                data_confidence * 0.3
-            )
+            confidence = score_confidence * 0.4 + quality_confidence * 0.3 + data_confidence * 0.3
 
             return float(confidence)
 
@@ -257,7 +256,7 @@ class SpeakerRecognition:
             logger.error(f"Error calculating confidence: {str(e)}")
             return 0.5
 
-    def save_profile(self, profile: Dict, output_path: str):
+    def save_profile(self, profile: dict, output_path: str):
         """
         Save speaker profile to file
 
@@ -266,7 +265,7 @@ class SpeakerRecognition:
             output_path: Output file path
         """
         try:
-            with open(output_path, 'w') as f:
+            with open(output_path, "w") as f:
                 json.dump(profile, f, indent=2)
 
             logger.info(f"Profile saved to {output_path}")
@@ -275,7 +274,7 @@ class SpeakerRecognition:
             logger.error(f"Error saving profile: {str(e)}")
             raise
 
-    def load_profile(self, profile_path: str) -> Dict:
+    def load_profile(self, profile_path: str) -> dict:
         """
         Load speaker profile from file
 
@@ -286,7 +285,7 @@ class SpeakerRecognition:
             Speaker profile dictionary
         """
         try:
-            with open(profile_path, 'r') as f:
+            with open(profile_path) as f:
                 profile = json.load(f)
 
             logger.info(f"Profile loaded from {profile_path}")
@@ -296,7 +295,7 @@ class SpeakerRecognition:
             logger.error(f"Error loading profile: {str(e)}")
             raise
 
-    def batch_compare(self, profile: Dict, audio_files: List[str]) -> List[float]:
+    def batch_compare(self, profile: dict, audio_files: list[str]) -> list[float]:
         """
         Compare a speaker profile against multiple audio files
 
@@ -310,7 +309,7 @@ class SpeakerRecognition:
         try:
             logger.info(f"Batch comparing against {len(audio_files)} files")
 
-            mean_embedding = np.array(profile['mean_embedding'])
+            mean_embedding = np.array(profile["mean_embedding"])
             similarities = []
 
             for audio_path in audio_files:
@@ -329,8 +328,9 @@ class SpeakerRecognition:
             logger.error(f"Error in batch comparison: {str(e)}")
             raise
 
-    def identify_speaker(self, audio_path: str, known_profiles: Dict[str, Dict],
-                        threshold: float = 0.7) -> Optional[str]:
+    def identify_speaker(
+        self, audio_path: str, known_profiles: dict[str, dict], threshold: float = 0.7
+    ) -> str | None:
         """
         Identify speaker from known profiles
 
@@ -353,7 +353,7 @@ class SpeakerRecognition:
             best_score = 0
 
             for name, profile in known_profiles.items():
-                mean_embedding = np.array(profile['mean_embedding'])
+                mean_embedding = np.array(profile["mean_embedding"])
                 similarity = self._cosine_similarity(embedding, mean_embedding)
                 similarity = (similarity + 1) / 2
 

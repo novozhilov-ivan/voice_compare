@@ -36,9 +36,3 @@ COPY run.py /app/
 
 # Create necessary directories
 RUN mkdir -p data/videos data/audio data/models
-
-# Expose port
-EXPOSE 8000
-
-# Run the application
-CMD ["python", "run.py"]

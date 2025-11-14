@@ -1,14 +1,14 @@
 """
 YouTube video downloader component
 """
-import yt_dlp
+
 import logging
-import os
 from pathlib import Path
-from typing import List, Optional, Dict
-import re
+
+import yt_dlp
 
 logger = logging.getLogger(__name__)
+
 
 class YouTubeDownloader:
     """Download videos and audio from YouTube"""
@@ -19,27 +19,29 @@ class YouTubeDownloader:
 
         # yt-dlp options for video download
         self.ydl_opts_video = {
-            'format': 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best',
-            'outtmpl': str(self.output_dir / '%(id)s.%(ext)s'),
-            'quiet': False,
-            'no_warnings': False,
-            'extract_flat': False,
-            'writesubtitles': True,
-            'writeautomaticsub': True,
-            'subtitleslangs': ['en', 'ru'],
+            "format": "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best",
+            "outtmpl": str(self.output_dir / "%(id)s.%(ext)s"),
+            "quiet": False,
+            "no_warnings": False,
+            "extract_flat": False,
+            "writesubtitles": True,
+            "writeautomaticsub": True,
+            "subtitleslangs": ["en", "ru"],
         }
 
         # yt-dlp options for audio only
         self.ydl_opts_audio = {
-            'format': 'bestaudio/best',
-            'outtmpl': str(self.output_dir / '%(id)s.%(ext)s'),
-            'postprocessors': [{
-                'key': 'FFmpegExtractAudio',
-                'preferredcodec': 'wav',
-                'preferredquality': '192',
-            }],
-            'quiet': False,
-            'no_warnings': False,
+            "format": "bestaudio/best",
+            "outtmpl": str(self.output_dir / "%(id)s.%(ext)s"),
+            "postprocessors": [
+                {
+                    "key": "FFmpegExtractAudio",
+                    "preferredcodec": "wav",
+                    "preferredquality": "192",
+                }
+            ],
+            "quiet": False,
+            "no_warnings": False,
         }
 
     def download_video(self, url: str, audio_only: bool = False) -> str:
@@ -61,7 +63,7 @@ class YouTubeDownloader:
             with yt_dlp.YoutubeDL(opts) as ydl:
                 # Get video info first
                 info = ydl.extract_info(url, download=False)
-                video_id = info['id']
+                video_id = info["id"]
 
                 # Download
                 ydl.download([url])
@@ -71,7 +73,7 @@ class YouTubeDownloader:
                     file_path = self.output_dir / f"{video_id}.wav"
                 else:
                     # Find the actual file (could be mp4, webm, etc.)
-                    for ext in ['mp4', 'webm', 'mkv']:
+                    for ext in ["mp4", "webm", "mkv"]:
                         potential_path = self.output_dir / f"{video_id}.{ext}"
                         if potential_path.exists():
                             file_path = potential_path
@@ -86,7 +88,7 @@ class YouTubeDownloader:
             logger.error(f"Error downloading video {url}: {str(e)}")
             raise
 
-    def get_video_info(self, url: str) -> Dict:
+    def get_video_info(self, url: str) -> dict:
         """
         Get video information without downloading
 
@@ -97,25 +99,25 @@ class YouTubeDownloader:
             Dictionary with video information
         """
         try:
-            with yt_dlp.YoutubeDL({'quiet': True}) as ydl:
+            with yt_dlp.YoutubeDL({"quiet": True}) as ydl:
                 info = ydl.extract_info(url, download=False)
 
                 return {
-                    'id': info.get('id'),
-                    'title': info.get('title'),
-                    'duration': info.get('duration'),
-                    'uploader': info.get('uploader'),
-                    'upload_date': info.get('upload_date'),
-                    'view_count': info.get('view_count'),
-                    'description': info.get('description'),
-                    'thumbnail': info.get('thumbnail'),
+                    "id": info.get("id"),
+                    "title": info.get("title"),
+                    "duration": info.get("duration"),
+                    "uploader": info.get("uploader"),
+                    "upload_date": info.get("upload_date"),
+                    "view_count": info.get("view_count"),
+                    "description": info.get("description"),
+                    "thumbnail": info.get("thumbnail"),
                 }
 
         except Exception as e:
             logger.error(f"Error getting video info for {url}: {str(e)}")
             raise
 
-    def get_playlist_videos(self, playlist_url: str) -> List[str]:
+    def get_playlist_videos(self, playlist_url: str) -> list[str]:
         """
         Get all video URLs from a playlist
 
@@ -129,20 +131,20 @@ class YouTubeDownloader:
             logger.info(f"Getting playlist videos from: {playlist_url}")
 
             opts = {
-                'extract_flat': True,
-                'quiet': True,
+                "extract_flat": True,
+                "quiet": True,
             }
 
             with yt_dlp.YoutubeDL(opts) as ydl:
                 playlist_info = ydl.extract_info(playlist_url, download=False)
 
-                if 'entries' not in playlist_info:
+                if "entries" not in playlist_info:
                     raise ValueError("Not a valid playlist URL")
 
                 video_urls = []
-                for entry in playlist_info['entries']:
+                for entry in playlist_info["entries"]:
                     if entry is not None:
-                        video_id = entry.get('id')
+                        video_id = entry.get("id")
                         if video_id:
                             video_urls.append(f"https://www.youtube.com/watch?v={video_id}")
 
@@ -153,7 +155,7 @@ class YouTubeDownloader:
             logger.error(f"Error getting playlist videos: {str(e)}")
             raise
 
-    def download_multiple_videos(self, urls: List[str], audio_only: bool = False) -> List[str]:
+    def download_multiple_videos(self, urls: list[str], audio_only: bool = False) -> list[str]:
         """
         Download multiple videos
 
@@ -167,7 +169,7 @@ class YouTubeDownloader:
         downloaded_files = []
 
         for i, url in enumerate(urls):
-            logger.info(f"Downloading video {i+1}/{len(urls)}")
+            logger.info(f"Downloading video {i + 1}/{len(urls)}")
             try:
                 file_path = self.download_video(url, audio_only)
                 downloaded_files.append(file_path)
@@ -177,7 +179,7 @@ class YouTubeDownloader:
 
         return downloaded_files
 
-    def get_channel_videos(self, channel_url: str, max_videos: Optional[int] = None) -> List[str]:
+    def get_channel_videos(self, channel_url: str, max_videos: int | None = None) -> list[str]:
         """
         Get video URLs from a channel
 
@@ -192,24 +194,24 @@ class YouTubeDownloader:
             logger.info(f"Getting videos from channel: {channel_url}")
 
             opts = {
-                'extract_flat': True,
-                'quiet': True,
-                'playlistend': max_videos if max_videos else None,
+                "extract_flat": True,
+                "quiet": True,
+                "playlistend": max_videos if max_videos else None,
             }
 
             # Add /videos to channel URL if not present
-            if '/videos' not in channel_url:
-                channel_url = channel_url.rstrip('/') + '/videos'
+            if "/videos" not in channel_url:
+                channel_url = channel_url.rstrip("/") + "/videos"
 
             with yt_dlp.YoutubeDL(opts) as ydl:
                 channel_info = ydl.extract_info(channel_url, download=False)
 
                 video_urls = []
-                entries = channel_info.get('entries', [])
+                entries = channel_info.get("entries", [])
 
                 for entry in entries:
                     if entry is not None:
-                        video_id = entry.get('id')
+                        video_id = entry.get("id")
                         if video_id:
                             video_urls.append(f"https://www.youtube.com/watch?v={video_id}")
 
@@ -228,11 +230,7 @@ class YouTubeDownloader:
             keep_recent: Number of recent files to keep
         """
         try:
-            files = sorted(
-                self.output_dir.glob('*'),
-                key=lambda x: x.stat().st_mtime,
-                reverse=True
-            )
+            files = sorted(self.output_dir.glob("*"), key=lambda x: x.stat().st_mtime, reverse=True)
 
             for file in files[keep_recent:]:
                 logger.info(f"Removing old file: {file}")

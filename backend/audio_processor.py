@@ -1,16 +1,18 @@
 """
 Audio extraction and processing component
 """
+
+import logging
+from pathlib import Path
+
 import ffmpeg
 import librosa
-import soundfile as sf
-import numpy as np
 import noisereduce as nr
-from pathlib import Path
-from typing import Tuple, Optional
-import logging
+import numpy as np
+import soundfile as sf
 
 logger = logging.getLogger(__name__)
+
 
 class AudioProcessor:
     """Extract and process audio from video files"""
@@ -20,7 +22,7 @@ class AudioProcessor:
         self.output_dir.mkdir(parents=True, exist_ok=True)
         self.sample_rate = 16000  # Standard for speech processing
 
-    def extract_audio(self, video_path: str, output_path: Optional[str] = None) -> str:
+    def extract_audio(self, video_path: str, output_path: str | None = None) -> str:
         """
         Extract audio from video file
 
@@ -48,9 +50,9 @@ class AudioProcessor:
             stream = ffmpeg.output(
                 stream,
                 str(output_path),
-                acodec='pcm_s16le',
+                acodec="pcm_s16le",
                 ac=1,  # mono
-                ar=str(self.sample_rate)  # sample rate
+                ar=str(self.sample_rate),  # sample rate
             )
             ffmpeg.run(stream, overwrite_output=True, quiet=True)
 
@@ -61,7 +63,7 @@ class AudioProcessor:
             logger.error(f"Error extracting audio: {str(e)}")
             raise
 
-    def load_audio(self, audio_path: str) -> Tuple[np.ndarray, int]:
+    def load_audio(self, audio_path: str) -> tuple[np.ndarray, int]:
         """
         Load audio file
 
@@ -79,7 +81,7 @@ class AudioProcessor:
             logger.error(f"Error loading audio: {str(e)}")
             raise
 
-    def save_audio(self, audio: np.ndarray, output_path: str, sample_rate: Optional[int] = None):
+    def save_audio(self, audio: np.ndarray, output_path: str, sample_rate: int | None = None):
         """
         Save audio to file
 
@@ -113,10 +115,7 @@ class AudioProcessor:
 
             # Use noisereduce library
             reduced_noise = nr.reduce_noise(
-                y=audio,
-                sr=sample_rate,
-                stationary=True,
-                prop_decrease=0.8
+                y=audio, sr=sample_rate, stationary=True, prop_decrease=0.8
             )
 
             return reduced_noise
@@ -138,10 +137,7 @@ class AudioProcessor:
         try:
             # Peak normalization
             max_amplitude = np.max(np.abs(audio))
-            if max_amplitude > 0:
-                normalized = audio / max_amplitude * 0.95
-            else:
-                normalized = audio
+            normalized = audio / max_amplitude * 0.95 if max_amplitude > 0 else audio
 
             return normalized
 
@@ -149,8 +145,7 @@ class AudioProcessor:
             logger.error(f"Error normalizing audio: {str(e)}")
             return audio
 
-    def trim_silence(self, audio: np.ndarray, sample_rate: int,
-                     top_db: int = 30) -> np.ndarray:
+    def trim_silence(self, audio: np.ndarray, sample_rate: int, top_db: int = 30) -> np.ndarray:
         """
         Trim silence from beginning and end of audio
 
@@ -199,8 +194,9 @@ class AudioProcessor:
             logger.error(f"Error enhancing speech: {str(e)}")
             return audio
 
-    def split_audio(self, audio: np.ndarray, sample_rate: int,
-                    segment_length: float = 30.0) -> list:
+    def split_audio(
+        self, audio: np.ndarray, sample_rate: int, segment_length: float = 30.0
+    ) -> list:
         """
         Split audio into segments
 
@@ -217,7 +213,7 @@ class AudioProcessor:
             segments = []
 
             for i in range(0, len(audio), segment_samples):
-                segment = audio[i:i + segment_samples]
+                segment = audio[i : i + segment_samples]
                 if len(segment) > sample_rate:  # Only keep segments > 1 second
                     segments.append(segment)
 
@@ -228,8 +224,9 @@ class AudioProcessor:
             logger.error(f"Error splitting audio: {str(e)}")
             return [audio]
 
-    def extract_segment(self, audio: np.ndarray, sample_rate: int,
-                       start_time: float, end_time: float) -> np.ndarray:
+    def extract_segment(
+        self, audio: np.ndarray, sample_rate: int, start_time: float, end_time: float
+    ) -> np.ndarray:
         """
         Extract a segment from audio
 
@@ -291,8 +288,7 @@ class AudioProcessor:
             logger.error(f"Error converting to mono: {str(e)}")
             return audio
 
-    def resample_audio(self, audio: np.ndarray, orig_sr: int,
-                      target_sr: int) -> np.ndarray:
+    def resample_audio(self, audio: np.ndarray, orig_sr: int, target_sr: int) -> np.ndarray:
         """
         Resample audio to different sample rate
 
@@ -313,8 +309,9 @@ class AudioProcessor:
             logger.error(f"Error resampling audio: {str(e)}")
             return audio
 
-    def process_audio_file(self, audio_path: str, enhance: bool = True,
-                          output_path: Optional[str] = None) -> str:
+    def process_audio_file(
+        self, audio_path: str, enhance: bool = True, output_path: str | None = None
+    ) -> str:
         """
         Process audio file with all enhancements
 
