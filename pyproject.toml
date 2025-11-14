@@ -23,7 +23,7 @@ dependencies = [
     # Speech Recognition & Speaker Analysis
     # Pinned versions for compatibility
     "speechbrain==1.0.2",
-    "torch==2.1.2",
+    "torch==2.8.0",
     "torchaudio==2.1.2",
     "transformers>=4.35.0",
     "pyannote-audio>=3.1.0",
