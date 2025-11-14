@@ -372,7 +372,7 @@ threadpoolctl==3.6.0
     # via scikit-learn
 tokenizers==0.15.2
     # via transformers
-torch==2.1.0
+torch==2.8.0
     # via
     #   voice-compare (pyproject.toml)
     #   asteroid-filterbanks
