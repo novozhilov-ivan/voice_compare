@@ -3,6 +3,8 @@ Main FastAPI application for voice comparison service
 """
 
 import logging
+import os
+from pathlib import Path
 
 from fastapi import BackgroundTasks, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -40,8 +42,20 @@ app.add_middleware(
 # Mount static files
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
+# Get cookies file path from environment or use default
+cookies_file = os.environ.get("YOUTUBE_COOKIES_FILE", "/app/cookies.txt")
+logger.info(f"Checking for cookies file at: {cookies_file}")
+cookies_file_path = Path(cookies_file)
+logger.info(f"Cookies file exists: {cookies_file_path.exists()}")
+if not cookies_file_path.exists():
+    logger.warning(f"YouTube cookies file not found at {cookies_file}")
+    logger.warning("Download may fail for some videos. See COOKIES_SETUP.md for instructions.")
+    cookies_file = None
+else:
+    logger.info(f"✓ Using YouTube cookies from: {cookies_file}")
+
 # Initialize components
-youtube_dl = YouTubeDownloader()
+youtube_dl = YouTubeDownloader(cookies_file=cookies_file)
 audio_processor = AudioProcessor()
 voice_analyzer = VoiceAnalyzer()
 speaker_recognition = SpeakerRecognition()
@@ -49,6 +63,20 @@ transcript_analyzer = TranscriptAnalyzer()
 
 
 # Data models
+class TimeRange(BaseModel):
+    """Time range for video segment in seconds"""
+
+    start: float = 0.0  # Start time in seconds
+    end: float | None = None  # End time in seconds (None = until end)
+
+
+class VideoWithTimeRange(BaseModel):
+    """Video URL with optional time range"""
+
+    url: HttpUrl
+    time_range: TimeRange | None = None
+
+
 class VideoRequest(BaseModel):
     urls: list[HttpUrl]
     target_speaker: str | None = None
@@ -62,8 +90,8 @@ class PlaylistRequest(BaseModel):
 
 
 class ComparisonRequest(BaseModel):
-    video1_urls: list[HttpUrl]
-    video2_urls: list[HttpUrl]
+    video1_urls: list[HttpUrl | VideoWithTimeRange]  # Support both formats
+    video2_urls: list[HttpUrl | VideoWithTimeRange]
     target_speaker1: str | None = None
     target_speaker2: str | None = None
     use_transcripts: bool = True
@@ -217,12 +245,29 @@ async def process_videos(
 
         for i, url in enumerate(video_urls):
             # Update progress
-            jobs[job_id]["message"] = f"Processing video {i + 1}/{len(video_urls)}"
+            jobs[job_id]["message"] = f"Downloading video {i + 1}/{len(video_urls)}"
 
-            # Download video
-            video_path = youtube_dl.download_video(url)
+            # Create progress callback for this video (using default arguments to capture loop variables)
+            def make_progress_hook(video_num, step_num):
+                def progress_hook(d):
+                    if d["status"] == "downloading":
+                        # Calculate download progress within current step
+                        downloaded = d.get("downloaded_bytes", 0)
+                        total = d.get("total_bytes") or d.get("total_bytes_estimate", 0)
+                        if total > 0:
+                            download_progress = downloaded / total
+                            # Update job progress: base progress + download progress for current step
+                            base_progress = step_num / total_steps
+                            step_progress = download_progress / total_steps
+                            jobs[job_id]["progress"] = base_progress + step_progress
+                            jobs[job_id]["message"] = f"Downloading video {video_num}/{len(video_urls)}: {int(download_progress * 100)}%"
+                return progress_hook
+
+            # Download video with progress tracking
+            video_path = youtube_dl.download_video(url, progress_callback=make_progress_hook(i + 1, current_step))
             current_step += 1
             jobs[job_id]["progress"] = current_step / total_steps
+            jobs[job_id]["message"] = f"Processing video {i + 1}/{len(video_urls)}"
 
             # Extract audio
             audio_path = audio_processor.extract_audio(video_path)
@@ -275,36 +320,96 @@ async def process_videos(
 
 async def compare_speaker_voices(
     job_id: str,
-    video_urls_1: list[str],
-    video_urls_2: list[str],
+    video_urls_1: list,  # list[HttpUrl | VideoWithTimeRange]
+    video_urls_2: list,  # list[HttpUrl | VideoWithTimeRange]
     target_speaker1: str | None,
     target_speaker2: str | None,
     use_transcripts: bool,
 ):
     """Compare speakers from two sets of videos"""
     try:
+        # Helper function to parse video entry (URL or VideoWithTimeRange)
+        def parse_video_entry(entry):
+            if isinstance(entry, dict) and "url" in entry:
+                # VideoWithTimeRange format
+                url = str(entry["url"])
+                time_range = entry.get("time_range")
+                if time_range:
+                    return url, time_range.get("start"), time_range.get("end")
+                return url, None, None
+            else:
+                # Plain URL format
+                return str(entry), None, None
+
         # Process first set of videos
-        jobs[job_id]["message"] = "Processing first speaker..."
-        jobs[job_id]["progress"] = 0.1
+        total_videos = len(video_urls_1) + len(video_urls_2)
+        processed = 0
 
         audio_files_1 = []
-        for url in video_urls_1:
-            video_path = youtube_dl.download_video(url)
-            audio_path = audio_processor.extract_audio(video_path)
-            audio_files_1.append(audio_path)
+        for i, video_entry in enumerate(video_urls_1):
+            url, start_time, end_time = parse_video_entry(video_entry)
 
+            time_info = ""
+            if start_time is not None or end_time is not None:
+                time_info = f" ({start_time or 0}s-{end_time or 'end'}s)"
+            jobs[job_id]["message"] = f"Downloading speaker 1 video {i + 1}/{len(video_urls_1)}{time_info}"
+
+            def make_progress_hook(video_num, total_vids, base_progress):
+                def progress_hook(d):
+                    if d["status"] == "downloading":
+                        downloaded = d.get("downloaded_bytes", 0)
+                        total = d.get("total_bytes") or d.get("total_bytes_estimate", 0)
+                        if total > 0:
+                            download_progress = downloaded / total
+                            jobs[job_id]["progress"] = base_progress + (download_progress * 0.4 / total_vids)
+                            jobs[job_id]["message"] = f"Speaker 1 video {video_num}/{total_vids}: {int(download_progress * 100)}%"
+                return progress_hook
+
+            video_path = youtube_dl.download_video(
+                url, progress_callback=make_progress_hook(i + 1, len(video_urls_1), processed / total_videos * 0.8)
+            )
+
+            # Extract audio with time range if specified
+            audio_path = audio_processor.extract_audio(video_path, start_time=start_time, end_time=end_time)
+            audio_files_1.append(audio_path)
+            processed += 1
+            jobs[job_id]["progress"] = (processed / total_videos) * 0.8
+
+        jobs[job_id]["message"] = "Creating speaker 1 profile..."
         profile_1 = speaker_recognition.create_speaker_profile(audio_files_1)
 
         # Process second set of videos
-        jobs[job_id]["message"] = "Processing second speaker..."
-        jobs[job_id]["progress"] = 0.5
-
         audio_files_2 = []
-        for url in video_urls_2:
-            video_path = youtube_dl.download_video(url)
-            audio_path = audio_processor.extract_audio(video_path)
-            audio_files_2.append(audio_path)
+        for i, video_entry in enumerate(video_urls_2):
+            url, start_time, end_time = parse_video_entry(video_entry)
 
+            time_info = ""
+            if start_time is not None or end_time is not None:
+                time_info = f" ({start_time or 0}s-{end_time or 'end'}s)"
+            jobs[job_id]["message"] = f"Downloading speaker 2 video {i + 1}/{len(video_urls_2)}{time_info}"
+
+            def make_progress_hook(video_num, total_vids, base_progress):
+                def progress_hook(d):
+                    if d["status"] == "downloading":
+                        downloaded = d.get("downloaded_bytes", 0)
+                        total = d.get("total_bytes") or d.get("total_bytes_estimate", 0)
+                        if total > 0:
+                            download_progress = downloaded / total
+                            jobs[job_id]["progress"] = base_progress + (download_progress * 0.4 / total_vids)
+                            jobs[job_id]["message"] = f"Speaker 2 video {video_num}/{total_vids}: {int(download_progress * 100)}%"
+                return progress_hook
+
+            video_path = youtube_dl.download_video(
+                url, progress_callback=make_progress_hook(i + 1, len(video_urls_2), processed / total_videos * 0.8)
+            )
+
+            # Extract audio with time range if specified
+            audio_path = audio_processor.extract_audio(video_path, start_time=start_time, end_time=end_time)
+            audio_files_2.append(audio_path)
+            processed += 1
+            jobs[job_id]["progress"] = (processed / total_videos) * 0.8
+
+        jobs[job_id]["message"] = "Creating speaker 2 profile..."
         profile_2 = speaker_recognition.create_speaker_profile(audio_files_2)
 
         # Compare profiles

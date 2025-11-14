@@ -103,7 +103,7 @@ class SpeakerRecognition:
             for audio_path in audio_files:
                 if use_segments:
                     # Extract voice segments
-                    from voice_analyzer import VoiceAnalyzer
+                    from .voice_analyzer import VoiceAnalyzer
 
                     analyzer = VoiceAnalyzer()
                     segment_files = analyzer.extract_voice_segments(audio_path)

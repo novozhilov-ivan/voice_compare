@@ -22,10 +22,40 @@ function showTab(tabName) {
     event.target.classList.add('active');
 }
 
+// Parse time range string (e.g., "120-300", "60-", "0-180")
+function parseTimeRange(timeStr) {
+    if (!timeStr || !timeStr.trim()) {
+        return null;
+    }
+
+    const parts = timeStr.trim().split('-');
+    if (parts.length !== 2) {
+        return null;
+    }
+
+    const start = parts[0] ? parseFloat(parts[0]) : 0;
+    const end = parts[1] ? parseFloat(parts[1]) : null;
+
+    return { start, end };
+}
+
+// Build video with time range object
+function buildVideoWithTimeRange(url, timeRange) {
+    if (!timeRange) {
+        return url;
+    }
+    return {
+        url: url,
+        time_range: timeRange
+    };
+}
+
 // Compare Speakers
 async function compareSpeakers() {
     const urls1 = document.getElementById('speaker1-urls').value.trim().split('\n').filter(url => url);
     const urls2 = document.getElementById('speaker2-urls').value.trim().split('\n').filter(url => url);
+    const times1 = document.getElementById('speaker1-times').value.trim().split('\n');
+    const times2 = document.getElementById('speaker2-times').value.trim().split('\n');
     const name1 = document.getElementById('speaker1-name').value.trim();
     const name2 = document.getElementById('speaker2-name').value.trim();
     const useTranscripts = document.getElementById('compare-use-transcripts').checked;
@@ -34,6 +64,17 @@ async function compareSpeakers() {
         showError('Please enter video URLs for both speakers');
         return;
     }
+
+    // Build video objects with time ranges
+    const video1Objects = urls1.map((url, i) => {
+        const timeRange = parseTimeRange(times1[i]);
+        return buildVideoWithTimeRange(url, timeRange);
+    });
+
+    const video2Objects = urls2.map((url, i) => {
+        const timeRange = parseTimeRange(times2[i]);
+        return buildVideoWithTimeRange(url, timeRange);
+    });
 
     try {
         showResults();
@@ -45,8 +86,8 @@ async function compareSpeakers() {
                 'Content-Type': 'application/json',
             },
             body: JSON.stringify({
-                video1_urls: urls1,
-                video2_urls: urls2,
+                video1_urls: video1Objects,
+                video2_urls: video2Objects,
                 target_speaker1: name1 || null,
                 target_speaker2: name2 || null,
                 use_transcripts: useTranscripts

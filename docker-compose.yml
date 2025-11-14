@@ -2,14 +2,19 @@ services:
   voice-compare:
     build: .
     container_name: voice-speaker-recognition
-    command: ["uv", "run", "uvicorn", "backend.app:app", "--host", "0.0.0.0", "--port", "8000"]
+    command: ["uv", "run", "uvicorn", "backend.app:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
     ports:
       - "8000:8000"
     volumes:
+      # Mount code for live reload (no rebuild needed!)
+      - ./backend:/app/backend
+      - ./static:/app/static
       # Mount data directories for persistence
       - ./data/videos:/app/data/videos
       - ./data/audio:/app/data/audio
       - ./data/models:/app/data/models
+      # Mount cookies file if it exists (for YouTube authentication)
+      - ./cookies.txt:/app/cookies.txt
     environment:
       - PYTHONUNBUFFERED=1
       - TORCHAUDIO_USE_BACKEND_DISPATCHER=1

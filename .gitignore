@@ -53,6 +53,10 @@ logs/
 .env
 .env.local
 
+# YouTube cookies (contains authentication tokens)
+cookies.txt
+*.cookies
+
 # Temporary files
 *.tmp
 *.temp

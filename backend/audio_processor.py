@@ -22,13 +22,21 @@ class AudioProcessor:
         self.output_dir.mkdir(parents=True, exist_ok=True)
         self.sample_rate = 16000  # Standard for speech processing
 
-    def extract_audio(self, video_path: str, output_path: str | None = None) -> str:
+    def extract_audio(
+        self,
+        video_path: str,
+        output_path: str | None = None,
+        start_time: float | None = None,
+        end_time: float | None = None,
+    ) -> str:
         """
         Extract audio from video file
 
         Args:
             video_path: Path to video file
             output_path: Optional output path for audio file
+            start_time: Start time in seconds (None = from beginning)
+            end_time: End time in seconds (None = until end)
 
         Returns:
             Path to extracted audio file
@@ -39,21 +47,38 @@ class AudioProcessor:
                 raise FileNotFoundError(f"Video file not found: {video_path}")
 
             if output_path is None:
-                output_path = self.output_dir / f"{video_path.stem}.wav"
+                # Add time range to filename if specified
+                time_suffix = ""
+                if start_time is not None or end_time is not None:
+                    time_suffix = f"_{int(start_time or 0)}-{int(end_time) if end_time else 'end'}"
+                output_path = self.output_dir / f"{video_path.stem}{time_suffix}.wav"
             else:
                 output_path = Path(output_path)
 
-            logger.info(f"Extracting audio from {video_path} to {output_path}")
+            time_info = ""
+            if start_time is not None or end_time is not None:
+                time_info = f" (time range: {start_time or 0}s - {end_time or 'end'}s)"
+            logger.info(f"Extracting audio from {video_path} to {output_path}{time_info}")
 
-            # Use ffmpeg to extract audio
-            stream = ffmpeg.input(str(video_path))
-            stream = ffmpeg.output(
-                stream,
-                str(output_path),
-                acodec="pcm_s16le",
-                ac=1,  # mono
-                ar=str(self.sample_rate),  # sample rate
-            )
+            # Use ffmpeg to extract audio with optional time range
+            input_kwargs = {}
+            if start_time is not None:
+                input_kwargs["ss"] = start_time  # Seek to start time
+
+            stream = ffmpeg.input(str(video_path), **input_kwargs)
+
+            output_kwargs = {
+                "acodec": "pcm_s16le",
+                "ac": 1,  # mono
+                "ar": str(self.sample_rate),  # sample rate
+            }
+
+            if end_time is not None:
+                # Calculate duration from start
+                duration = end_time - (start_time or 0)
+                output_kwargs["t"] = duration
+
+            stream = ffmpeg.output(stream, str(output_path), **output_kwargs)
             ffmpeg.run(stream, overwrite_output=True, quiet=True)
 
             logger.info(f"Audio extracted successfully to {output_path}")
