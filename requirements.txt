@@ -275,7 +275,7 @@ python-dotenv==1.0.0
     # via
     #   voice-compare (pyproject.toml)
     #   uvicorn
-python-multipart==0.0.6
+python-multipart==0.0.22
     # via voice-compare (pyproject.toml)
 pytorch-lightning==2.5.6
     # via lightning
