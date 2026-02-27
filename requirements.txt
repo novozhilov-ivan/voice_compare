@@ -236,7 +236,7 @@ propcache==0.4.1
     # via
     #   aiohttp
     #   yarl
-protobuf==6.33.0
+protobuf==6.33.5
     # via tensorboardx
 pyannote-audio==3.1.0
     # via voice-compare (pyproject.toml)
